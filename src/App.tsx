@@ -1,35 +1,98 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useCallback, useEffect, useState } from 'react';
+import words from './wordList.json';
+import HangmanDrawing from './components/HangmanDrawing';
+import HangmanWord from './components/HangmanWord';
+import Keyboard from './components/Keyboard';
 
+function getWord() {
+	return words[Math.floor(Math.random() * words.length)];
+}
 function App() {
-  const [count, setCount] = useState(0)
+	const [wordToGuess, setWordToGuess] = useState(() => {
+		const randomIndex = Math.floor(Math.random() * words.length);
+		return words[randomIndex];
+	});
 
-  return (
-    <>
-      <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+	console.log(wordToGuess);
+
+	const [guessedLetters, setGuessedLetters] = useState<string[]>([]);
+
+	const incorrectLetters = guessedLetters.filter((letter) => !wordToGuess.includes(letter));
+
+	const isLoser = incorrectLetters.length >= 6;
+	const isWinner = wordToGuess.split('').every((letter) => guessedLetters.includes(letter));
+
+	const addGuessedLetter = useCallback(
+		(letter: string) => {
+			if (guessedLetters.includes(letter) || isLoser || isWinner) return;
+
+			setGuessedLetters((currentLetters) => [...currentLetters, letter]);
+		},
+		[guessedLetters, isWinner, isLoser]
+	);
+
+	useEffect(() => {
+		const handler = (e: KeyboardEvent) => {
+			const key = e.key;
+			if (!key.match(/^[a-z]$/)) return;
+
+			e.preventDefault();
+			addGuessedLetter(key);
+		};
+
+		document.addEventListener('keypress', handler);
+
+		return () => {
+			document.removeEventListener('keypress', handler);
+		};
+	}, [guessedLetters]);
+
+	useEffect(() => {
+		const handler = (e: KeyboardEvent) => {
+			const key = e.key;
+			if (key !== 'Enter') return;
+
+			e.preventDefault();
+			setGuessedLetters([]);
+			setWordToGuess(getWord());
+		};
+
+		document.addEventListener('keypress', handler);
+
+		return () => {
+			document.removeEventListener('keypress', handler);
+		};
+	}, []);
+
+	return (
+		<div
+			style={{
+				maxWidth: '800px',
+				display: 'flex',
+				flexDirection: 'column',
+				gap: '2rem',
+				margin: '0 auto',
+				alignItems: 'center',
+			}}>
+			<div style={{ fontSize: '2rem', textAlign: 'center' }}>
+				{isWinner && 'Winner! - Refresh your browser to try again'}
+				{isLoser && 'You Lost! - Refresh your browser to try again'}
+			</div>
+			<HangmanDrawing numberOfGuesses={incorrectLetters.length} />
+			<HangmanWord
+				guessedLetters={guessedLetters}
+				wordToGuess={wordToGuess}
+			/>
+			<div style={{ alignSelf: 'stretch' }}>
+				<Keyboard
+					disabled={isWinner || isLoser}
+					activeLetters={guessedLetters.filter((letter) => wordToGuess.includes(letter))}
+					inactiveLetters={incorrectLetters}
+					addGuessedLetter={addGuessedLetter}
+				/>
+			</div>
+		</div>
+	);
 }
 
-export default App
+export default App;
